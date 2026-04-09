@@ -2,9 +2,8 @@
 
 source /opt/config/mod/.shell/0.sh
 
-
-if [ ! -f "${KLIPPER_DIR}/klippy/extras/ifs_jacker_plugin.py" ]; then
-    ln -s ${MOD_CONF}/mod_data/plugins/ifs_jacker_plugin/ifs_jacker_plugin.py ${KLIPPER_DIR}/klippy/extras/ifs_jacker_plugin.py
+if [ ! -f "${KLIPPER_DIR}/klippy/extras/ifs_jacker.py" ]; then
+    ln -s ${MOD_CONF}/mod_data/plugins/ifs_jacker/ifs_jacker.py ${KLIPPER_DIR}/klippy/extras/ifs_jacker.py
 fi
 
 echo "IFS Jacker plugin installed"
