@@ -2,7 +2,7 @@ from pathlib import Path
 import re, threading, time, logging
 
 IFS_JACKER_CHECK_RETRY = 3
-IFS_JACKER_CHECK_RETRY_DELAY = 30
+IFS_JACKER_CHECK_RETRY_DELAY = 10
 
 class IFSJacker:
     def __init__(self, config):
@@ -26,11 +26,12 @@ class IFSJacker:
         
         self.peripheral_states = []
         
-        self.gcode.register_command('IFSJ_Z1', self.cmd_IFSJ_Z1)        # Вставить пруток
-        self.gcode.register_command('IFSJ_Z2', self.cmd_IFSJ_Z2)        # Извлечь пруток
-        self.gcode.register_command('IFSJ_Z3', self.cmd_IFSJ_Z3)        # Состояние IFS
-        self.gcode.register_command('IFSJ_Z4', self.cmd_IFSJ_Z4)        # Сброс драйвера
-        self.gcode.register_command('IFSJ_Z5', self.cmd_IFSJ_Z5)        # Отжим филамента везде
+        self.gcode.register_command('CHECK_FOR_IFS_JACKER', self.cmd_CHECK_FOR_IFS_JACKER) # Manually force check
+        self.gcode.register_command('IFSJ_Z1', self.cmd_IFSJ_Z1)
+        self.gcode.register_command('IFSJ_Z2', self.cmd_IFSJ_Z2)
+        self.gcode.register_command('IFSJ_Z3', self.cmd_IFSJ_Z3)
+        self.gcode.register_command('IFSJ_Z4', self.cmd_IFSJ_Z4)
+        self.gcode.register_command('IFSJ_Z5', self.cmd_IFSJ_Z5)
         
     def _handle_ready(self):
         self.zmod_ifs = self.printer.lookup_object('zmod_ifs')
@@ -43,19 +44,22 @@ class IFSJacker:
             try:
                 if self.zmod_ifs.ifs: 
                     if self.ifs_jacker_present is None and time.monotonic() > self.next_ifs_jacker_check:
-                        self.check_for_ifs_jacker()
-                        if not self.ifs_jacker_present and self.ifs_jacker_check_attempts < IFS_JACKER_CHECK_RETRY:
-                            self.ifs_jacker_present = None
-                            self.next_ifs_jacker_check = time.monotonic() + IFS_JACKER_CHECK_RETRY_DELAY
+                        self.check_for_ifs_jacker(True)
+                        if not self.ifs_jacker_present:
+                            if self.ifs_jacker_check_attempts < IFS_JACKER_CHECK_RETRY:
+                                self.ifs_jacker_present = None
+                                self.ifs_jacker_check_attempts += 1
+                                self.next_ifs_jacker_check = time.monotonic() + IFS_JACKER_CHECK_RETRY_DELAY
                         else:
                             self.send_gcode_command_from_update_loop('_IFS_JACKER_CONNECTED')
+                            self.ifs_jacker_check_attempts = 0
                     if self.ifs_jacker_present:
-                        data_str = self.zmod_ifs.last_F13_raw_response
+                        data_str = self.zmod_ifs.ifs_data.lastResponseRaw
                         for peripheral_match in self.peripheral_regex.finditer(data_str):
                             peripheral_id, peripheral_state = peripheral_match.groups()
                             peripheral_id = int(peripheral_id)
-                            if len(self.peripheral_states) <= self.peripheral_id:
-                                self.peripheral_states += [0] * (self.peripheral_id + 1 - len(self.peripheral_states))
+                            if len(self.peripheral_states) <= peripheral_id:
+                                self.peripheral_states += [0] * (peripheral_id + 1 - len(self.peripheral_states))
                             self.peripheral_states[peripheral_id] = peripheral_state
                 elif self.ifs_jacker_present is not None:
                     self.ifs_jacker_version = 0.0
@@ -68,24 +72,56 @@ class IFSJacker:
                 logging.warning("IFS Jacker error: %s", e)
             time.sleep(self.wait_time)
             
-    def check_for_ifs_jacker(self):
+    def check_for_ifs_jacker(self, is_from_thread):
         logging.info("IFS Jacker: Checking for IFS Jacker...")
-        response = self.send_ifs_command_from_update_loop("Z2")
+        if is_from_thread:
+            response = self.send_ifs_command_from_update_loop("Z2")
+        else:
+            response = self.zmod_ifs.send_command_and_wait("Z2")
         if response:
             if 'software: "IFS Jacker' in response: # End quote intentionally missing
                 self.ifs_jacker_present = True
+                logging.info(f"IFS Jacker: Detected IFS Jacker.")
+                
+                if not is_from_thread:
+                    self.gcode.run_script_from_command('RESPOND PREFIX="info" MSG="IFS Jacker connected"') 
+                
                 version_check = re.search(r'version:\s*"(.*?)"', response)
                 if version_check:
                     self.ifs_jacker_version = float('.'.join(version_check.group(1).split('.')[0:2]))
-                    logging.info(f"IFS Jacker: Detected IFS Jacker. Firmware version {self.ifs_jacker_version}")
+                    logging.info(f"IFS Jacker: Firmware version {self.ifs_jacker_version}")
                 else:
-                    logging.info(f"IFS Jacker: Detected IFS Jacker. Could not detect firmware version.")
+                    logging.info(f"IFS Jacker: Could not detect firmware version")
                     self.ifs_jacker_version = 2.1  # Lowest supported version
+                    
+                channel_count = re.search(r'channel_count:\s*(\d+)', response)
+                if channel_count:
+                    chan_count = max(int(channel_count.group(1)), 1)
+                    self.zmod_ifs.auto_update_color_limit = False
+                    self.zmod_ifs.update_color_limit(chan_count)
+                    logging.info(f"IFS Jacker: {chan_count} channels")
+                else:
+                    logging.info(f"IFS Jacker: Could not detect channel count")
+                    
+                peripheral_count = 0
+                if self.ifs_jacker_version >= 2.2:
+                    peripheral_count_re = re.search(r'peripheral_count:\s*(\d+)', response)
+                    if peripheral_count_re:
+                        peripheral_count = int(peripheral_count_re.group(1))
+                        
+                self.peripheral_states = [0] * peripheral_count
                 return
+                
+        if not is_from_thread:
+            self.gcode.run_script_from_command('RESPOND PREFIX="info" MSG="IFS Jacker not connected"') 
         
         self.ifs_jacker_version = 0.0
         self.ifs_jacker_present = False
-        self.send_ifs_command_from_update_loop("F13", force=True) # To clear the Z2 command from the queue, otherwise zMod enters an infinite loop of sending Z2 and getting no response
+        self.peripheral_states = [0] * len(self.peripheral_states)
+        if is_from_thread:
+            self.send_ifs_command_from_update_loop("F13", force=True) # To clear the Z2 command from the queue, otherwise zMod enters an infinite loop of sending Z2 and getting no response
+        else:
+            self.zmod_ifs.send_command_and_wait("F13")
         logging.info("IFS Jacker: No IFS Jacker detected")
             
     def validate_version(self, min_ver=0.0):
@@ -144,6 +180,8 @@ class IFSJacker:
         return ''
             
             
+    def cmd_CHECK_FOR_IFS_JACKER(self, gcmd):
+        self.check_for_ifs_jacker(False)
                 
     def cmd_IFSJ_Z1(self, gcmd):
         if not self.validate_version(0.0):
