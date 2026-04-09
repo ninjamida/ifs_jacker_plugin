@@ -9,6 +9,10 @@ class IFSJacker:
         self.printer = config.get_printer()
         self.reactor = self.printer.get_reactor()
         
+        zmod_color = self.printer.lookup_object('zmod_color', None)
+        if zmod_color.get_display():
+            return
+        
         self.gcode = self.printer.lookup_object('gcode')
         
         self.printer.register_event_handler("klippy:ready", self._handle_ready)
