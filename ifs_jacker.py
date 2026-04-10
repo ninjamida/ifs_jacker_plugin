@@ -2,7 +2,8 @@ from pathlib import Path
 import re, threading, time, logging
 
 IFS_JACKER_CHECK_RETRY = 3
-IFS_JACKER_CHECK_RETRY_DELAY = 10
+IFS_JACKER_CHECK_RETRY_DELAY = 3
+IFS_JACKER_CHECK_INITIAL_DELAY = 30
 
 class IFSJacker:
     def __init__(self, config):
@@ -19,7 +20,7 @@ class IFSJacker:
         
         self.ifs_jacker_version = 0.0
         self.ifs_jacker_present = None
-        self.next_ifs_jacker_check = time.monotonic()
+        self.next_ifs_jacker_check = 0.0 # Actual initial value is set in _handle_ready
         self.ifs_jacker_check_attempts = 0
         
         self.stop_thread = False
@@ -39,10 +40,11 @@ class IFSJacker:
         
     def _handle_ready(self):
         self.zmod_ifs = self.printer.lookup_object('zmod_ifs')
+        self.next_ifs_jacker_check = time.monotonic() + IFS_JACKER_CHECK_INITIAL_DELAY
         self.update_thread.start()
         
     def _update_ifs_jacker_data(self):
-        logging.info("IFS Jacker: Starting update thread")
+        logging.info(f"IFS Jacker: Starting update thread")
         self.peripheral_regex = re.compile(r'peripheral_(\d+):\s*(\d+)')
         while not self.stop_thread:
             try:
@@ -65,13 +67,14 @@ class IFSJacker:
                             if len(self.peripheral_states) <= peripheral_id:
                                 self.peripheral_states += [0] * (peripheral_id + 1 - len(self.peripheral_states))
                             self.peripheral_states[peripheral_id] = peripheral_state
-                elif self.ifs_jacker_present is not None:
-                    self.ifs_jacker_version = 0.0
-                    self.ifs_jacker_present = None
-                    self.peripheral_states = [0] * len(self.peripheral_states)
-                    self.next_ifs_jacker_check = time.monotonic()
-                    self.ifs_jacker_check_attempts = 0
-                    logging.info("IFS Jacker: IFS disconnected. IFS Jacker status cleared")
+                else:
+                    self.next_ifs_jacker_check = max(time.monotonic() + IFS_JACKER_CHECK_RETRY_DELAY, self.next_ifs_jacker_check)
+                    if self.ifs_jacker_present is not None:
+                        self.ifs_jacker_version = 0.0
+                        self.ifs_jacker_present = None
+                        self.peripheral_states = [0] * len(self.peripheral_states)
+                        self.ifs_jacker_check_attempts = 0
+                        logging.info("IFS Jacker: IFS disconnected. IFS Jacker status cleared")
             except Exception as e:
                 logging.warning("IFS Jacker error: %s", e)
             time.sleep(self.wait_time)

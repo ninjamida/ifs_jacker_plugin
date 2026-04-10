@@ -18,3 +18,15 @@ path: /root/printer_data/config/mod_data/plugins/ifs_jacker
 origin: https://github.com/ninjamida/ifs_jacker_plugin.git
 is_system_service: False
 primary_branch: master
+
+
+If you have this plugin installed but have a normal IFS (rather than an IFS
+Jacker) connected, your IFS will disconnect a few times when zMod is starting
+up. After the third time, it should stop doing so. This is because of it sending
+a command intended to detect an IFS Jacker, which a regular IFS cannot respond
+to, and thus zMod interprets it as a disconnect. After three failed attempts,
+the plugin stops performing this check until the IFS is disconnected and
+reconnected or the printer is rebooted.
+
+If you are reverting to a regular IFS long-term, it is better to disable the
+IFS Jacker plugin.
