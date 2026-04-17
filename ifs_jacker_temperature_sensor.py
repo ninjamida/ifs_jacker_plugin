@@ -9,13 +9,13 @@ class ifs_jacker_temperature_sensor:
         self.factor = config.getfloat('factor', 0.01)
         self.min_temp = config.getfloat('min_temp', -273.15)
         self.max_temp = config.getfloat('max_temp', 999)
-        
+
         self.ifs_jacker = None
         self.temp = min(self.max_temp, max(self.min_temp, 0.0))
         self.poll_interval = 1.0
-        
+
         self.printer.register_event_handler("klippy:ready", self._handle_ready)
-        
+
         self.printer.add_object("ifs_jacker_temperature_sensor " + self.name, self)
         self.sample_timer = self.reactor.register_timer(self._sample)
 
@@ -32,22 +32,22 @@ class ifs_jacker_temperature_sensor:
                 else:
                     self.temp = -1
             else:
-                self.temp = -1                
-            
+                self.temp = -1
+
             measured_time = self.reactor.monotonic()
             self._callback(self.mcu.estimated_print_time(measured_time), self.temp)
         except Exception:
             logging.exception('Exception reading IFS Jacker temperature sensor')
 
         return eventtime + self.poll_interval
-    
+
     def setup_minmax(self, min_temp, max_temp):
         self.min_temp = min_temp
         self.max_temp = max_temp
 
     def setup_callback(self, cb):
         self._callback = cb
-        
+
     def get_report_time_delta(self):
         return self.poll_interval
 
