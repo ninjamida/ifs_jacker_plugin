@@ -12,6 +12,8 @@ class ifs_jacker:
 
         self.gcode = self.printer.lookup_object('gcode')
 
+        self.peripheral_states = []
+
         zmod_color = self.printer.lookup_object('zmod_color', None)
         if zmod_color.get_display():
             self.register_commands_display()
@@ -28,9 +30,7 @@ class ifs_jacker:
         self.update_thread = threading.Thread(target=self._update_ifs_jacker_data)
         self.update_thread.daemon = True
 
-        self.wait_time = config.get('wait_time', 1)
-
-        self.peripheral_states = []
+        self.wait_time = config.getfloat('wait_time', 1)
 
         self.gcode.register_command('IFSJ_CHECK', self.cmd_IFSJ_CHECK) # Manually force check
         self.gcode.register_command('IFSJ_Z1', self.cmd_IFSJ_Z1)
@@ -128,7 +128,7 @@ class ifs_jacker:
                     if peripheral_count_re:
                         peripheral_count = int(peripheral_count_re.group(1))
 
-                self.peripheral_states = [0] * peripheral_count
+                self.peripheral_states = [-1] * peripheral_count
                 return
 
         if not is_from_thread:
