@@ -19,6 +19,13 @@ origin: https://github.com/ninjamida/ifs_jacker_plugin.git
 is_system_service: False
 primary_branch: master
 
+Every time you update this plugin, you should re-run the ENABLE_PLUGIN macro for
+it. This is for two reasons - there may be new scripts to install (this plugin
+installs Python scripts in addition to the usual CFG files) which the install
+script needs to handle; and a reboot is generally necessary after updates which
+the install script also triggers.
+  ENABLE_PLUGIN NAME=ifs_jacker
+
 
 If you have this plugin installed but have a normal IFS (rather than an IFS
 Jacker) connected, your IFS will disconnect a few times when zMod is starting
