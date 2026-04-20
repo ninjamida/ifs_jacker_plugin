@@ -2,18 +2,19 @@
 
 source /opt/config/mod/.shell/0.sh
 
-if [ ! -f "${KLIPPER_DIR}/klippy/extras/ifs_jacker.py" ]; then
-    ln -s ${MOD_CONF}/mod_data/plugins/ifs_jacker/ifs_jacker.py ${KLIPPER_DIR}/klippy/extras/ifs_jacker.py
-fi
-if [ ! -f "${KLIPPER_DIR}/klippy/extras/ifs_jacker_temperature_sensor.py" ]; then
-    ln -s ${MOD_CONF}/mod_data/plugins/ifs_jacker/ifs_jacker_temperature_sensor.py ${KLIPPER_DIR}/klippy/extras/ifs_jacker_temperature_sensor.py
-fi
-if [ ! -f "${KLIPPER_DIR}/klippy/extras/ifs_jacker_fan.py" ]; then
-    ln -s ${MOD_CONF}/mod_data/plugins/ifs_jacker/ifs_jacker_fan.py ${KLIPPER_DIR}/klippy/extras/ifs_jacker_fan.py
-fi
-if [ ! -f "${KLIPPER_DIR}/klippy/extras/ifs_jacker_led.py" ]; then
-    ln -s ${MOD_CONF}/mod_data/plugins/ifs_jacker/ifs_jacker_led.py ${KLIPPER_DIR}/klippy/extras/ifs_jacker_led.py
-fi
+SOURCE_DIR="${MOD_CONF}/mod_data/plugins/ifs_jacker"
+TARGET_DIRS="${MOD_CONF}/base/klipper/klippy/extras ${KLIPPER_DIR}/klippy/extras"
+
+for file in "$SOURCE_DIR"/*.py; do
+    [ -e "$file" ] || continue
+    filename=$(basename "$file")
+    for target in $TARGET_DIRS; do
+        target_path="$target/$filename"
+        if [ ! -e "$target_path" ]; then
+            ln -s "$file" "$target_path"
+        fi
+    done
+done
 
 echo "IFS Jacker plugin installed"
 echo "REBOOT" >/tmp/printer
