@@ -20,6 +20,11 @@ installs Python scripts in addition to the usual CFG files) which the install
 script needs to handle; and a reboot is generally necessary after updates which
 the install script also triggers.
   ENABLE_PLUGIN NAME=ifs_jacker
+  
+If you get errors immediately after an update that prevent you from being able
+to do this, edit your plugins.cfg file (in mod_data) and remove the include line
+for ifs_jacker.cfg. Then, you should be able FIRMWARE_RESTART and run the enable
+command again, and all should be well after that.
 
 
 If you have this plugin installed but have a normal IFS (rather than an IFS
@@ -32,3 +37,9 @@ reconnected or the printer is rebooted.
 
 If you are reverting to a regular IFS long-term, it is better to disable the
 IFS Jacker plugin.
+
+
+You may wish to have config file entries that are only used when the IFS Jacker
+plugin is active. You can achieve this by adding them in user_ifs_jacker.cfg
+(created the first time ENABLE_PLUGIN NAME=ifs_jacker is run for V2.5.0 or
+above).
