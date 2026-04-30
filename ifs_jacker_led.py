@@ -49,7 +49,7 @@ class ifs_jacker_led:
             self.color = color
             if self.kind == 'rgbw' or self.kind == 'rgb':
                 put_data = 0
-                for i in reverse(range(len(self.kind))):
+                for i in reversed(range(len(self.kind))):
                     put_data = (put_data << 8) | max(0, min(255, int(255 * color[i])))
             else: # Assume 'mono'
                 put_data = max(0, min(65535, int(65535 * color[3])))
