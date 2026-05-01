@@ -57,7 +57,7 @@ class ifs_jacker:
 
     def _update_ifs_jacker_data(self):
         logging.info(f"IFS Jacker: Starting update thread")
-        self.peripheral_regex = re.compile(r'peripheral_(\d+):\s*(\d+)')
+        self.peripheral_regex = re.compile(r'(?:\s|^)p(\d+)_(..*?):\s*(.+?)(?=\s|$)')
         while not self.stop_thread:
             try:
                 if self.zmod_ifs.ifs:
@@ -72,19 +72,29 @@ class ifs_jacker:
                             self.send_gcode_command_from_update_loop('_IFS_JACKER_CONNECTED')
                             self.ifs_jacker_check_attempts = 0
                     if self.ifs_jacker_present:
-                        data_str = self.zmod_ifs.ifs_data.lastResponseRaw
+                        with self.zmod_ifs.ifs_data.lock:
+                            data_str = self.zmod_ifs.ifs_data.lastResponseRaw
+                        logging.info(f'IFSJ F13 response: {data_str}')
                         for peripheral_match in self.peripheral_regex.finditer(data_str):
-                            peripheral_id, peripheral_state = peripheral_match.groups()
+                            peripheral_id, peripheral_param, peripheral_state = peripheral_match.groups()
                             peripheral_id = int(peripheral_id)
-                            if len(self.peripheral_states) <= peripheral_id:
-                                self.peripheral_states += [0] * (peripheral_id + 1 - len(self.peripheral_states))
-                            self.peripheral_states[peripheral_id] = peripheral_state
+                            while len(self.peripheral_states) <= peripheral_id:
+                                self.peripheral_states.append({})
+                            try:
+                                peripheral_state = int(peripheral_state)
+                            except:
+                                try:
+                                    peripheral_state = float(peripheral_state)
+                                except:
+                                    pass
+                            self.peripheral_states[peripheral_id][peripheral_param] = peripheral_state
                 else:
                     self.next_ifs_jacker_check = max(time.monotonic() + IFS_JACKER_CHECK_RETRY_DELAY, self.next_ifs_jacker_check)
                     if self.ifs_jacker_present is not None:
                         self.ifs_jacker_version = 0.0
                         self.ifs_jacker_present = None
-                        self.peripheral_states = [0] * len(self.peripheral_states)
+                        for i in range(len(self.peripheral_states)):
+                            self.peripheral_states[i].clear()
                         self.ifs_jacker_check_attempts = 0
                         logging.info("IFS Jacker: IFS disconnected. IFS Jacker status cleared")
             except Exception as e:
@@ -128,7 +138,11 @@ class ifs_jacker:
                     if peripheral_count_re:
                         peripheral_count = int(peripheral_count_re.group(1))
 
-                self.peripheral_states = [-1] * peripheral_count
+                for i in range(peripheral_count):
+                    if i < len(self.peripheral_states):
+                        self.peripheral_states[i].clear()
+                    else:
+                        self.peripheral_states.append({})
                 return
 
         if not is_from_thread:
@@ -136,7 +150,8 @@ class ifs_jacker:
 
         self.ifs_jacker_version = 0.0
         self.ifs_jacker_present = False
-        self.peripheral_states = [0] * len(self.peripheral_states)
+        for i in range(len(self.peripheral_states)):
+            self.peripheral_states[i].clear()
         if is_from_thread:
             self.send_ifs_command_from_update_loop("F13", force=True) # To clear the Z2 command from the queue, otherwise zMod enters an infinite loop of sending Z2 and getting no response
         else:
@@ -175,15 +190,17 @@ class ifs_jacker:
         command_id = 0
         while time.monotonic() - start_time < timeout:
             if not command_issued:
+                need_sleep_time = 0
                 with self.zmod_ifs._command_lock:
                     if '#' in self.zmod_ifs._command and not force:
-                        time.sleep(0.1)
+                        need_sleep_time = 0.1
                     else:
                         command_id = self.zmod_ifs._command_id + 1
                         self.zmod_ifs._command_id = command_id
                         self.zmod_ifs._command = f'{command}#{command_id}'
-                        time.sleep(0.02)
+                        need_sleep_time = 0.02
                         command_issued = True
+                time.sleep(need_sleep_time)
             else:
                 with self.zmod_ifs._ret_command_lock:
                     ret_command_data = self.zmod_ifs._ret_command_data

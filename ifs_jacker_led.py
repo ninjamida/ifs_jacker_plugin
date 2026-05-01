@@ -1,20 +1,42 @@
+# NOT currently usable. Needs to be updated to new peripheral setup.
+
 class ifs_jacker_led:
     def __init__(self, config):
+        # Begin general IFS Jacker peripheral code #
         self.printer = config.get_printer()
         self.name = config.get_name().split()[-1]
+        self.reactor = self.printer.get_reactor()
         self.gcode = self.printer.lookup_object('gcode')
-        self.peripheral_index = config.getint('peripheral_index')
-        self.kind = config.get('kind', 'mono') # 'mono', 'rgb', 'rgbw'
-        _ = config.get('color_order')
-        
-        self.pled = self.printer.load_object(config, "led")
-        self.led_helper = self.pled.setup_helper(config, self.update_leds)
 
         self.zmod_ifs = None
         self.ifs_jacker = None
-        
+
         self.printer.register_event_handler("klippy:ready", self._handle_ready)
-        self.printer.add_object("led " + self.name, self)        
+
+        self.peripheral_index = config.getint('peripheral_index')
+        # End general IFS Jacker peripheral code #
+
+        self.kind = config.get('kind', 'mono') # 'mono', 'rgb', 'rgbw'
+        
+        self.pled = self.printer.load_object(config, "led")
+        self.led_helper = self.pled.setup_helper(config, self.update_leds)
+        
+        self.printer.add_object("led " + self.name, self)
+
+    def _handle_ready(self):
+        # Begin general IFS Jacker peripheral code #
+        self.zmod_ifs = self.printer.lookup_object('zmod_ifs')
+        self.ifs_jacker = self.printer.lookup_object('ifs_jacker')
+        # End general IFS Jacker peripheral code #
+        self._hijack_config()        
+
+    # Begin general IFS Jacker peripheral code #
+    def get_status_params(self):
+        if not self.ifs_jacker or self.peripheral_index < 0 or self.peripheral_index >= len(self.ifs_jacker.peripheral_states):
+            return {}
+        else:
+            return self.ifs_jacker.peripheral_states[self.peripheral_index]
+    # End general IFS Jacker peripheral code #
         
     def _hijack_config(self):
         # Since a lot of third-party stuff (Fluidd, HelixScreen, etc) don't play nice with custom LEDs, we have to
@@ -35,11 +57,6 @@ class ifs_jacker_led:
             new_order = 'W'
             
         target_settings['color_order'] = new_order
-
-    def _handle_ready(self):
-        self.zmod_ifs = self.printer.lookup_object('zmod_ifs')
-        self.ifs_jacker = self.printer.lookup_object('ifs_jacker')
-        self._hijack_config()
         
     def update_leds(self, led_state, print_time):
         self.set_color(led_state[0])

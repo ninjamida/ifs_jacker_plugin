@@ -2,42 +2,61 @@ import logging
 
 class ifs_jacker_temperature_sensor:
     def __init__(self, config):
+        # Begin general IFS Jacker peripheral code #
         self.printer = config.get_printer()
-        self.reactor = self.printer.get_reactor()
         self.name = config.get_name().split()[-1]
+        self.reactor = self.printer.get_reactor()
+        self.gcode = self.printer.lookup_object('gcode')
+
+        self.zmod_ifs = None
+        self.ifs_jacker = None
+
+        self.printer.register_event_handler("klippy:ready", self._handle_ready)
+
         self.peripheral_index = config.getint('peripheral_index')
-        self.factor = config.getfloat('factor', 0.01)
+        # End general IFS Jacker peripheral code #
+
+        self.read_param = config.get('read_param', 'temperature')
+    
         self.min_temp = config.getfloat('min_temp', -273.15)
         self.max_temp = config.getfloat('max_temp', 999)
 
-        self.ifs_jacker = None
-        self.temp = min(self.max_temp, max(self.min_temp, 0.0))
+        self.temp = min(self.max_temp, max(self.min_temp, -1.0))
         self.poll_interval = 1.0
-
-        self.printer.register_event_handler("klippy:ready", self._handle_ready)
 
         self.printer.add_object("ifs_jacker_temperature_sensor " + self.name, self)
         self.sample_timer = self.reactor.register_timer(self._sample)
 
     def _handle_ready(self):
+        # Begin general IFS Jacker peripheral code #
+        self.zmod_ifs = self.printer.lookup_object('zmod_ifs')
         self.ifs_jacker = self.printer.lookup_object('ifs_jacker')
+        # End general IFS Jacker peripheral code #
+
         self.reactor.update_timer(self.sample_timer, self.reactor.NOW)
         self.mcu = self.printer.lookup_object('mcu')
 
-    def _sample(self, eventtime):
-        try:
-            if self.ifs_jacker and self.ifs_jacker.ifs_jacker_present:
-                if self.peripheral_index < len(self.ifs_jacker.peripheral_states):
-                    self.temp = int(self.ifs_jacker.peripheral_states[self.peripheral_index]) * self.factor
-                else:
-                    self.temp = -1
-            else:
-                self.temp = -1
+    # Begin general IFS Jacker peripheral code #
+    def get_status_params(self):
+        if not self.ifs_jacker or self.peripheral_index < 0 or self.peripheral_index >= len(self.ifs_jacker.peripheral_states):
+            return {}
+        else:
+            return self.ifs_jacker.peripheral_states[self.peripheral_index]
+    # End general IFS Jacker peripheral code #
 
-            measured_time = self.reactor.monotonic()
-            self._callback(self.mcu.estimated_print_time(measured_time), self.temp)
-        except Exception:
-            logging.exception('Exception reading IFS Jacker temperature sensor')
+    def _sample(self, eventtime):
+        if self.ifs_jacker and self.ifs_jacker.ifs_jacker_present:
+            params = self.get_status_params()
+            try:
+                self.temp = float(params.get(self.read_param))
+            except:
+                logging.info(f"IFS Jacker: Exception reading {self.name}, param value '{params.get(self.read_param)}'")
+                # Just keep the old value.
+        else:
+            self.temp = -1.0
+
+        measured_time = self.reactor.monotonic()
+        self._callback(self.mcu.estimated_print_time(measured_time), self.temp)
 
         return eventtime + self.poll_interval
 
