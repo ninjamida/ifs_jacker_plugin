@@ -1,4 +1,4 @@
-# NOT currently usable. Needs to be updated to new peripheral setup.
+import logging
 
 class ifs_jacker_led:
     def __init__(self, config):
@@ -15,8 +15,6 @@ class ifs_jacker_led:
 
         self.peripheral_index = config.getint('peripheral_index')
         # End general IFS Jacker peripheral code #
-
-        self.kind = config.get('kind', 'mono') # 'mono', 'rgb', 'rgbw'
         
         self.pled = self.printer.load_object(config, "led")
         self.led_helper = self.pled.setup_helper(config, self.update_leds)
@@ -49,14 +47,7 @@ class ifs_jacker_led:
             target_settings = {}
             configfile.status_settings[section_name] = target_settings
             
-        if self.kind == 'rgbw':
-            new_order = 'RGBW'
-        elif self.kind == 'rgb':
-            new_order = 'RGB'
-        else: # Assume 'mono'
-            new_order = 'W'
-            
-        target_settings['color_order'] = new_order
+        target_settings['color_order'] = 'W'
         
     def update_leds(self, led_state, print_time):
         self.set_color(led_state[0])
@@ -64,29 +55,21 @@ class ifs_jacker_led:
     def set_color(self, color):
         if self.ifs_jacker and self.ifs_jacker.ifs_jacker_present:
             self.color = color
-            if self.kind == 'rgbw' or self.kind == 'rgb':
-                put_data = 0
-                for i in reversed(range(len(self.kind))):
-                    put_data = (put_data << 8) | max(0, min(255, int(255 * color[i])))
-            else: # Assume 'mono'
-                put_data = max(0, min(65535, int(65535 * color[3])))
+            put_data = max(0, min(65535, int(65535 * color[3])))
             self.zmod_ifs.send_command_and_wait(f"Z5 C{self.peripheral_index} F3 L{put_data}")
 
     def get_status(self, eventtime=None):
         color = [0.0] * 4
         if self.ifs_jacker and self.ifs_jacker.ifs_jacker_present:
-            if self.peripheral_index < len(self.ifs_jacker.peripheral_states):
-                raw_data = int(self.ifs_jacker.peripheral_states[self.peripheral_index])
-                if self.kind == 'rgbw' or self.kind == 'rgb':
-                    color = [0.0] * 4
-                    for i in range(len(self.kind)):
-                        color[i] = ((raw_data >> (i * 8)) & 0xFF) / 255
-                    if self.kind == 'rgb':
-                        color[3] = int((color[0] + color[1] + color[2]) / 3)
-                else: # Assume 'mono'
-                    brightness = raw_data / 65535
-                    color = [brightness] * 4
-            
+            params = self.get_status_params()
+            try:
+                power = int(params.get('power')) / 65535
+            except:
+                logging.info(f"IFS Jacker: Exception reading {self.name}, param value '{params.get('power', '<none>')}'")
+                power = 0
+        else:
+            power = 0
+        color = [power] * 4            
         self.led_helper.led_state = [color]
         return self.led_helper.get_status(eventtime)
         
