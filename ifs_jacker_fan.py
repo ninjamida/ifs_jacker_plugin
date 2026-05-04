@@ -47,7 +47,7 @@ class ifs_jacker_fan:
             try:
                 return int(params.get('power')) / 65535
             except:
-                logging.info(f"IFS Jacker: Exception reading {self.name}, param value '{params.get('power')}'")
+                logging.info(f"IFS Jacker: Exception reading {self.name}, param value '{params.get('power', '<none>')}'")
                 return 0
         else:
             return 0

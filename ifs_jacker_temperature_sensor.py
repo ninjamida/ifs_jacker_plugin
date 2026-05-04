@@ -50,7 +50,7 @@ class ifs_jacker_temperature_sensor:
             try:
                 self.temp = float(params.get(self.read_param))
             except:
-                logging.info(f"IFS Jacker: Exception reading {self.name}, param value '{params.get(self.read_param)}'")
+                logging.info(f"IFS Jacker: Exception reading {self.name}, param value '{params.get(self.read_param, '<none>')}'")
                 # Just keep the old value.
         else:
             self.temp = -1.0

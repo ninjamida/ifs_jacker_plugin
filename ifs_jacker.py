@@ -74,7 +74,6 @@ class ifs_jacker:
                     if self.ifs_jacker_present:
                         with self.zmod_ifs.ifs_data.lock:
                             data_str = self.zmod_ifs.ifs_data.lastResponseRaw
-                        logging.info(f'IFSJ F13 response: {data_str}')
                         for peripheral_match in self.peripheral_regex.finditer(data_str):
                             peripheral_id, peripheral_param, peripheral_state = peripheral_match.groups()
                             peripheral_id = int(peripheral_id)
