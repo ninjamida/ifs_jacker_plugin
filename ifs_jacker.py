@@ -119,11 +119,14 @@ class ifs_jacker:
                     self.ifs_jacker_version = float('.'.join(version_check.group(1).split('.')[0:2]))
                     logging.info(f"IFS Jacker: Firmware version {self.ifs_jacker_version}")
                     if self.ifs_jacker_version < 3.0:
-                        logging.warning(f"IFS Jacker firmware is outdated. Please upgrade to 3.0.0 or higher. All IFS Jacker plugin features except multi-IFS support disabled.")
+                        self.gcode.run_script_from_command('RESPOND PREFIX="warning" MSG="IFS Jacker firmware is outdated. Please upgrade to 3.0.0 or higher. All IFS Jacker plugin features except multi-IFS support disabled."')
                         self.ifs_jacker_present = False
+                        self.ifs_jacker_check_attempts = IFS_JACKER_CHECK_RETRY
                 else:
-                    logging.warning(f"IFS Jacker: Could not detect firmware version. All IFS Jacker plugin features except multi-IFS support disabled.")
+                    self.gcode.run_script_from_command('RESPOND PREFIX="warning" MSG="Could not detect IFS Jacker firmware version. Please ensure you are running firmware 3.0.0 or higher. All IFS Jacker plugin features except multi-IFS support disabled."')
                     self.ifs_jacker_version = 2.1  # Lowest supported version
+                    self.ifs_jacker_present = False
+                    self.ifs_jacker_check_attempts = IFS_JACKER_CHECK_RETRY
 
                 channel_count = re.search(r'channel_count:\s*(\d+)', response)
                 if channel_count:
