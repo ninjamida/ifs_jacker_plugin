@@ -118,8 +118,11 @@ class ifs_jacker:
                 if version_check:
                     self.ifs_jacker_version = float('.'.join(version_check.group(1).split('.')[0:2]))
                     logging.info(f"IFS Jacker: Firmware version {self.ifs_jacker_version}")
+                    if self.ifs_jacker_version < 3.0:
+                        logging.warning(f"IFS Jacker firmware is outdated. Please upgrade to 3.0.0 or higher. All IFS Jacker plugin features except multi-IFS support disabled.")
+                        self.ifs_jacker_present = False
                 else:
-                    logging.info(f"IFS Jacker: Could not detect firmware version")
+                    logging.warning(f"IFS Jacker: Could not detect firmware version. All IFS Jacker plugin features except multi-IFS support disabled.")
                     self.ifs_jacker_version = 2.1  # Lowest supported version
 
                 channel_count = re.search(r'channel_count:\s*(\d+)', response)
@@ -132,7 +135,7 @@ class ifs_jacker:
                     logging.info(f"IFS Jacker: Could not detect channel count")
 
                 peripheral_count = 0
-                if self.ifs_jacker_version >= 2.2:
+                if self.ifs_jacker_version >= 3.0:
                     peripheral_count_re = re.search(r'peripheral_count:\s*(\d+)', response)
                     if peripheral_count_re:
                         peripheral_count = int(peripheral_count_re.group(1))
@@ -155,7 +158,7 @@ class ifs_jacker:
             self.send_ifs_command_from_update_loop("F13", force=True) # To clear the Z2 command from the queue, otherwise zMod enters an infinite loop of sending Z2 and getting no response
         else:
             self.zmod_ifs.send_command_and_wait("F13")
-        logging.info("IFS Jacker: No IFS Jacker detected")
+        logging.warning("IFS Jacker: No IFS Jacker detected")
 
     def validate_version(self, min_ver=0.0):
         if not self.zmod_ifs.ifs:
