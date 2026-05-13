@@ -75,6 +75,9 @@ class ifs_jacker_temperature_sensor:
         return {
             'temperature': self.temp
         }
+        
+    def get_temp(self, eventtime):
+        return self.temp, 0.0
 
 def load_config(config):
     pheaters = config.get_printer().load_object(config, "heaters")
