@@ -17,6 +17,7 @@ class ifs_jacker_temperature_sensor:
         # End general IFS Jacker peripheral code #
 
         self.read_param = config.get('read_param', 'temperature')
+        self.read_factor = config.getfloat('read_factor', 1.0)
     
         self.min_temp = config.getfloat('min_temp', -273.15)
         self.max_temp = config.getfloat('max_temp', 999)
@@ -48,7 +49,7 @@ class ifs_jacker_temperature_sensor:
         if self.ifs_jacker and self.ifs_jacker.ifs_jacker_present:
             params = self.get_status_params()
             try:
-                self.temp = float(params.get(self.read_param))
+                self.temp = float(params.get(self.read_param)) * self.read_factor
             except:
                 logging.info(f"IFS Jacker: Exception reading {self.name}, param value '{params.get(self.read_param, '<none>')}'")
                 # Just keep the old value.
@@ -74,6 +75,9 @@ class ifs_jacker_temperature_sensor:
         return {
             'temperature': self.temp
         }
+        
+    def get_temp(self, eventtime):
+        return self.temp, 0.0
 
 def load_config(config):
     pheaters = config.get_printer().load_object(config, "heaters")
