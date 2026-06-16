@@ -38,6 +38,7 @@ class ifs_jacker:
         self.gcode.register_command('IFSJ_Z3', self.cmd_IFSJ_Z3)
         self.gcode.register_command('IFSJ_Z4', self.cmd_IFSJ_Z4)
         self.gcode.register_command('IFSJ_Z5', self.cmd_IFSJ_Z5)
+        self.gcode.register_command('IFSJ_Z7', self.cmd_IFSJ_Z7)
 
     def register_commands_display(self):
         self.gcode.register_command('IFSJ_CHECK', self.cmd_display_dummy)
@@ -46,6 +47,7 @@ class ifs_jacker:
         self.gcode.register_command('IFSJ_Z3', self.cmd_display_dummy)
         self.gcode.register_command('IFSJ_Z4', self.cmd_display_dummy)
         self.gcode.register_command('IFSJ_Z5', self.cmd_display_dummy)
+        self.gcode.register_command('IFSJ_Z7', self.cmd_display_dummy)
 
     def cmd_display_dummy(self, gcmd):
         self.gcode.run_script_from_command("_IFS_JACKER_DISPLAY")
@@ -122,6 +124,8 @@ class ifs_jacker:
                         self.gcode.run_script_from_command('RESPOND PREFIX="warning" MSG="IFS Jacker firmware is outdated. Please upgrade to 3.0.0 or higher. All IFS Jacker plugin features except multi-IFS support disabled."')
                         self.ifs_jacker_present = False
                         self.ifs_jacker_check_attempts = IFS_JACKER_CHECK_RETRY
+                    elif self.ifs_jacker_version < 3.2:
+                        self.gcode.run_script_from_command('RESPOND PREFIX="warning" MSG="IFS Jacker firmware is outdated. Please upgrade to 3.2.0 or higher. Some functionality may not be available."')
                 else:
                     self.gcode.run_script_from_command('RESPOND PREFIX="warning" MSG="Could not detect IFS Jacker firmware version. Please ensure you are running firmware 3.0.0 or higher. All IFS Jacker plugin features except multi-IFS support disabled."')
                     self.ifs_jacker_version = 2.1  # Lowest supported version
@@ -263,6 +267,13 @@ class ifs_jacker:
 
         response = self.zmod_ifs.send_command_and_wait(f"Z5 C{peripheral} F{command} L{param1} S{param2}")
         self.gcode.respond_info(f"Z5 > {response}")
+        
+    def cmd_IFSJ_Z7(self, gcmd):
+        if not self.validate_version(3.2):
+            return
+
+        response = self.zmod_ifs.send_command_and_wait("Z7")
+        self.gcode.respond_info(f"Z7 > {response}")
 
 
 def load_config(config):
